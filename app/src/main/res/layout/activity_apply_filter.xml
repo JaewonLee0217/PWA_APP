@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ApplyFilter"
+    android:background="#F6F6F6"
+    android:backgroundTint="#FFFDE1">
+
+    <View
+        android:id="@+id/ai_"
+        android:layout_width="200dp"
+        android:layout_height="50dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="60dp"
+        android:background="@drawable/categorytitle" />
+
+    <ImageView
+        android:id="@+id/orgImage"
+        android:layout_width="276dp"
+        android:layout_height="220dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="150dp" />
+
+    <ImageView
+        android:id="@+id/filteredImage"
+        android:layout_width="276dp"
+        android:layout_height="220dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="420dp"/>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:layout_alignParentTop="true"
+        android:layout_centerInParent="true"
+        android:layout_marginTop="680dp">
+
+        <View
+            android:id="@+id/saveImage"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_marginRight="50dp"
+            android:background="@drawable/upload" />
+
+
+        <View
+            android:id="@+id/shareImage"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:background="@drawable/share2" />
+
+    </LinearLayout>
+
+
+
+    <ProgressBar
+        android:id="@+id/progress"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_centerInParent="true"
+        android:visibility="gone" />
+
+
+
+</RelativeLayout>
