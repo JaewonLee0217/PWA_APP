@@ -3,38 +3,25 @@ package com.knowhow.android.picturewithai;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
-import android.Manifest;
-import android.app.Dialog;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Looper;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ProgressBar;
-import android.widget.Toast;
 
-import com.google.gson.JsonObject;
+
 import com.knowhow.android.picturewithai.remote.ApiConstants;
 import com.knowhow.android.picturewithai.remote.ServiceInterface;
-import com.knowhow.android.picturewithai.utils.FileUtil;
-
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,14 +32,12 @@ import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
-import retrofit2.Retrofit;
+
 
 public class SelectCategory extends AppCompatActivity {
 
     private static final int REQUEST_EXTERNAL_STORAGE = 100;
-    private static final int PERMISSIONS_REQUEST_CAMERA = 0;
-    private static final int PERMISSIONS_WRITE_EXTERNAL_STORAGE = 0;
-    private static final int PERMISSIONS_READ_EXTERNAL_STORAGE = 0;
+
 
     ServiceInterface serviceInterface;
     List<Uri> files = new ArrayList<>();
@@ -72,10 +57,8 @@ public class SelectCategory extends AppCompatActivity {
         progress = findViewById(R.id.progress);
 
 
-
-
-        View personimage = findViewById(R.id.personImage);
-        personimage.setOnClickListener(v -> {
+        View personImage = findViewById(R.id.personImage);
+        personImage.setOnClickListener(v -> {
 
             launchGalleryIntent();
             type="Person";
@@ -83,8 +66,8 @@ public class SelectCategory extends AppCompatActivity {
         });
 
 
-        View sightimage = findViewById(R.id.sightImage);
-        sightimage.setOnClickListener(v -> {
+        View sightImage = findViewById(R.id.sightImage);
+        sightImage.setOnClickListener(v -> {
 
             launchGalleryIntent();
             type="Background";
@@ -95,7 +78,6 @@ public class SelectCategory extends AppCompatActivity {
 
 
     public void predictPerson() {
-        Log.d("type", "person");
 
         List<MultipartBody.Part> list = new ArrayList<>();
 
@@ -154,13 +136,13 @@ public class SelectCategory extends AppCompatActivity {
 
 
     public void predictBackground() {
-        Log.d("type", "background");
+
         List<MultipartBody.Part> list = new ArrayList<>();
 
         for (Uri uri : files) {
 
-
             list.add(prepareFilePart("image", uri));
+
         }
 
         serviceInterface = ApiConstants.getClient().create(ServiceInterface.class);
@@ -190,7 +172,7 @@ public class SelectCategory extends AppCompatActivity {
 
                     Intent intent = new Intent(SelectCategory.this, BestPicture.class);
                     intent.putExtra("path", String.valueOf(files.get(best_idx)));
-                    Log.d("files", String.valueOf(best_idx));
+                    Log.d("best: ", String.valueOf(best_idx));
 
 
                     startActivity(intent);
@@ -217,24 +199,6 @@ public class SelectCategory extends AppCompatActivity {
     }
 
 
-    @NonNull
-    private MultipartBody.Part prepareFilePart(String partName, Uri fileUri) {
-
-        File file = new File(fileUri.getPath());
-        Log.i("here is error", file.getAbsolutePath());
-        // create RequestBody instance from file
-
-        RequestBody requestFile =
-                RequestBody.create(
-                        MediaType.parse("image/*"),
-                        file);
-
-        // MultipartBody.Part is used to send also the actual file name
-        return MultipartBody.Part.createFormData(partName, file.getName(), requestFile);
-
-
-    }
-
 
     public void launchGalleryIntent() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
@@ -247,50 +211,27 @@ public class SelectCategory extends AppCompatActivity {
 
 
 
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_EXTERNAL_STORAGE && resultCode == RESULT_OK) {
 
-
-            final List<Bitmap> bitmaps = new ArrayList<>();
             ClipData clipData = data.getClipData();
-
 
 
             if (clipData != null) {
                 //multiple images selecetd
                 for (int i = 0; i < clipData.getItemCount(); i++) {
                     Uri img = clipData.getItemAt(i).getUri();
-                    String imgPath = FileUtil.getPath(SelectCategory.this,img);
+                    String imgPath = getImagePathFromUri(img);
                     files.add(Uri.parse(imgPath));
-
-
-                    try {
-                        InputStream inputStream = getContentResolver().openInputStream(img);
-                        Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
-                        bitmaps.add(bitmap);
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    }
                 }
 
             } else {
                 //single image selected
-
                 Uri img = data.getData();
-                String imgPath = FileUtil.getPath(SelectCategory.this,img);
+                String imgPath = getImagePathFromUri(img);
                 files.add(Uri.parse(imgPath));
-
-
-                try {
-                    InputStream inputStream = getContentResolver().openInputStream(img);
-                    Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
-                    bitmaps.add(bitmap);
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                }
 
             }
 
@@ -300,11 +241,46 @@ public class SelectCategory extends AppCompatActivity {
                 predictPerson();
             }
 
-
-
-
         }
     }
+
+
+    @NonNull
+    private MultipartBody.Part prepareFilePart(String partName, Uri fileUri) {
+
+        File file = new File(fileUri.getPath());
+        // create RequestBody instance from file
+
+        RequestBody requestFile =
+                RequestBody.create(
+                        MediaType.parse("image/*"),
+                        file);
+
+        // MultipartBody.Part is used to send also the actual file name
+        return MultipartBody.Part.createFormData(partName, file.getName(), requestFile);
+    }
+
+
+
+    public String getImagePathFromUri(Uri uri){
+        Cursor cursor = getContentResolver().query(uri, null, null, null, null);
+        cursor.moveToFirst();
+        String document_id = cursor.getString(0);
+        document_id = document_id.substring(document_id.lastIndexOf(":")+1);
+        cursor.close();
+
+        cursor = getContentResolver().query(
+                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                null, MediaStore.Images.Media._ID + " = ? ", new String[]{document_id}, null);
+        cursor.moveToFirst();
+        String path = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA));
+        cursor.close();
+
+        return path;
+    }
+
+
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode,

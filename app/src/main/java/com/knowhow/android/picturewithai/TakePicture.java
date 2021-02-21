@@ -1,40 +1,28 @@
 package com.knowhow.android.picturewithai;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.ImageFormat;
-import android.graphics.Rect;
-import android.graphics.YuvImage;
-import android.hardware.Camera;
+import android.graphics.Color;
+import android.graphics.Matrix;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Looper;
-import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.ImageView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -44,23 +32,19 @@ import com.knowhow.android.picturewithai.remote.ApiConstants;
 import com.knowhow.android.picturewithai.remote.ServiceInterface;
 
 
-import com.knowhow.android.picturewithai.utils.FileUtil;
 
 import org.json.JSONObject;
-import org.pytorch.Module;
+
 
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -77,31 +61,13 @@ public class TakePicture extends AppCompatActivity{
     private CameraSurfaceView cameraSurfaceView; // 카메라 surfaceview
 
 
-    private ServiceInterface serviceInterface;
-    private ImageButton button_capture;
     private Bitmap nowBitmap=null;
     public Context mContext;
 
-    private static final int PERMISSIONS_REQUEST_CAMERA = 0;
     private static final int PERMISSIONS_WRITE_EXTERNAL_STORAGE = 0;
-    private static final int PERMISSIONS_READ_EXTERNAL_STORAGE = 0;
-    private static final double THRESHOLD = 0.95;
-    private static final double box_thres1 = 1280 * 0.45;
-    private static final double box_thres2 = 1280 * 0.55;
-    private static final double topthres_1 = 720 * 0.35;
-    private static final double topthres_2 = 720 * 0.35;
-
-    //topthres_2 = img.size[1] * 0.55
-    //bottomthres = img.size[1] * 0.9
-
-
-    private SubThread subThread = new SubThread();
-
-
-    private ProgressBar progress;
+    public SubThread subThread;
     public Boolean stop=false;
 
-    //Module module;
 
 
     @Override
@@ -123,42 +89,32 @@ public class TakePicture extends AppCompatActivity{
             }
 
         }
-        button_capture = findViewById(R.id.button);
+
+        ImageButton button_capture = findViewById(R.id.button);
         button_capture.setOnClickListener(view -> captureFace());
 
 
-        progress = findViewById(R.id.progress) ;
+    }
+
+    @Override
+    public void onResume(){
+        super.onResume();
+
+        stop=false;
+        nowBitmap=null;
+        cameraSurfaceView.nowBitmap=null;
+        subThread = new SubThread();
         subThread.setDaemon(true);
         subThread.start();  // sub thread 시작
 
-//        try {
-//            module = Module.load(assetFilePath(this, "model.pt"));
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-
     }
 
-    public static String assetFilePath(Context context, String assetName) throws IOException {
-        File file = new File(context.getFilesDir(), assetName);
-        if (file.exists() && file.length() > 0) {
-            return file.getAbsolutePath();
-        }
-
-        try (InputStream is = context.getAssets().open(assetName)) {
-            try (OutputStream os = new FileOutputStream(file)) {
-                byte[] buffer = new byte[4 * 1024];
-                int read;
-                while ((read = is.read(buffer)) != -1) {
-                    os.write(buffer, 0, read);
-                }
-                os.flush();
-            }
-            return file.getAbsolutePath();
-        }
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        stop=true;
+        subThread.interrupt();
     }
-
-
 
 
     class SubThread extends Thread {
@@ -174,26 +130,20 @@ public class TakePicture extends AppCompatActivity{
                 nowBitmap=cameraSurfaceView.nowBitmap;
             }
 
-            Uri uri = getImageUri(TakePicture.this, nowBitmap);
-            String ImgPath = FileUtil.getPath(TakePicture.this,uri);
-            analyzeImage(Uri.parse(ImgPath));
+            analyzeImage(nowBitmap);
         }
 
 
-        public void analyzeImage(Uri uri){
+        public void analyzeImage(Bitmap bitmap){
 
-//        if (Looper.myLooper() == Looper.getMainLooper()){
-//            Log.d("looper", "main thread");
-//        } else{
-//            Log.d("looper", "not main thread");
-//        }
-            runOnUiThread(() -> progress.setVisibility(View.VISIBLE));
+            File file=convertBitmapToFile(bitmap);
+            RequestBody reqFile = RequestBody.create(MediaType.parse("image/*"), file);
+            MultipartBody.Part body = MultipartBody.Part.createFormData("image", file.getName(), reqFile);
 
-
-            serviceInterface = ApiConstants.getClient().create(ServiceInterface.class);
+            ServiceInterface serviceInterface = ApiConstants.getClient().create(ServiceInterface.class);
 
 
-            Call<ResponseBody> call = serviceInterface.analyzeImages(prepareFilePart("image", uri));
+            Call<ResponseBody> call = serviceInterface.analyzeImages(body);
 
 
             call.enqueue(new Callback<ResponseBody>() {
@@ -203,30 +153,30 @@ public class TakePicture extends AppCompatActivity{
                 @Override
                 public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
 
-
                     try {
 
-                        runOnUiThread(() -> progress.setVisibility(View.GONE));
 
+                        JSONObject jObject = new JSONObject(response.body().string());
+                        String message = jObject.getString("sen");
+                        if (!stop) {
+                            Toast toast = Toast.makeText(TakePicture.this, message, Toast.LENGTH_SHORT);
 
-                        if(!stop) {
-                            JSONObject jObject = new JSONObject(response.body().string());
-                            String message = jObject.getString("sen");
+                            TextView textView = new TextView(TakePicture.this);
+                            textView.setBackgroundResource(R.drawable.rounded_corner_rectangle);
+                            textView.setTextColor(Color.WHITE);
+                            textView.setTextSize(15);
 
-                            Toast toast = Toast.makeText(TakePicture.this, message, Toast.LENGTH_LONG);
-                            ViewGroup group = (ViewGroup) toast.getView();
-                            TextView messageTextView = (TextView) group.getChildAt(0);
-                            messageTextView.setTextSize(30);
+                            textView.setPadding(20, 20, 20, 20);
+                            textView.setText(message);
                             toast.setGravity(Gravity.CENTER, 0, 0);
+                            toast.setView(textView);
+
+
                             toast.show();
-
                             nowBitmap = cameraSurfaceView.nowBitmap;
-                            Uri uri = getImageUri(TakePicture.this, nowBitmap);
 
-                            String ImgPath = FileUtil.getPath(TakePicture.this, uri);
-                            analyzeImage(Uri.parse(ImgPath));
+                            analyzeImage(nowBitmap);
                         }
-
 
                     }
                     catch (Exception e){
@@ -241,59 +191,52 @@ public class TakePicture extends AppCompatActivity{
 
                     Log.i("my",t.getMessage());
 
-
                 }
             });
         }
-
-        @NonNull
-        private MultipartBody.Part prepareFilePart(String partName, Uri fileUri) {
-
-            File file = new File(fileUri.getPath());
-            Log.i("here is error",file.getAbsolutePath());
-            // create RequestBody instance from file
-
-            RequestBody requestFile =
-                    RequestBody.create(
-                            MediaType.parse("image/*"),
-                            file);
-
-            // MultipartBody.Part is used to send also the actual file name
-            return MultipartBody.Part.createFormData(partName, file.getName(), requestFile);
-
-
-        }
     }
-
-
-
-    public Uri getImageUri(Context inContext, Bitmap inImage) {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        inImage.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-        String path = MediaStore.Images.Media.insertImage(inContext.getContentResolver(), inImage, "Title", null);
-        return Uri.parse(path);
-    }
-
 
 
 
     public void captureFace() {
 
-
         cameraSurfaceView.capture((data, camera) -> {
             stop=true;
+            subThread.interrupt();
 
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize = 3;
 
-            Bitmap frontBitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-            saveImage(frontBitmap);
+            Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
 
+
+            Matrix matrix = new Matrix();
+            matrix.postRotate(90);
+
+            // We rotate the same Bitmap
+            Bitmap rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
+
+            saveImage(rotatedBitmap);
+
+            Toast toast = Toast.makeText(TakePicture.this,"Completely Saved!", Toast.LENGTH_SHORT);
+
+            TextView textView = new TextView(TakePicture.this);
+            textView.setBackgroundResource(R.drawable.rounded_corner_rectangle);
+            textView.setTextColor(Color.WHITE);
+            textView.setTextSize(20);
+
+            textView.setPadding(20, 20, 20, 20);
+            textView.setText(getString(R.string.saved));
+            toast.setGravity(Gravity.CENTER, 0, 0);
+            toast.setView(textView);
+
+
+            toast.show();
 
             Intent intent = new Intent(TakePicture.this, BestPicture.class);
 
-            Uri uri = getImageUri(TakePicture.this, frontBitmap);
-            String ImgPath = FileUtil.getPath(TakePicture.this,uri);
+            Uri uri = getImageUri(TakePicture.this, rotatedBitmap);
+            String ImgPath=getImagePathFromUri(uri);
             intent.putExtra("path", String.valueOf(Uri.parse(ImgPath)));
 
 
@@ -305,15 +248,24 @@ public class TakePicture extends AppCompatActivity{
 
 
 
+    public Uri getImageUri(Context inContext, Bitmap inImage) {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        inImage.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
+        @SuppressLint("SimpleDateFormat") String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        String path = MediaStore.Images.Media.insertImage(inContext.getContentResolver(), inImage, timeStamp, null);
+        return Uri.parse(path);
+    }
+
+
 
     private void saveImage(Bitmap frontBitmap) {
 
         String root = Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES).toString();
+                Environment.DIRECTORY_DOCUMENTS).toString();
         File myDir = new File(root);
 
         @SuppressLint("SimpleDateFormat") String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        String fname = "Front-" + timeStamp + ".png";
+        String fname = timeStamp + ".png";
         File file = new File(myDir, fname);
 
 
@@ -342,6 +294,52 @@ public class TakePicture extends AppCompatActivity{
                     }
                 });
 
+    }
+
+    public String getImagePathFromUri(Uri contentUri) {
+
+        String[] proj = { MediaStore.Images.Media.DATA };
+
+        Cursor cursor = getContentResolver().query(contentUri, proj, null, null, null);
+        cursor.moveToNext();
+        String path = cursor.getString(cursor.getColumnIndex(MediaStore.MediaColumns.DATA));
+
+        cursor.close();
+        return path;
+    }
+
+    private File convertBitmapToFile(Bitmap bitmap) {
+
+        //create a file to write bitmap data
+        File file = new File(this.getCacheDir(), "nowFrame");
+
+
+        try {
+            file.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100 /*ignored for PNG*/, bos);
+        byte[] bitmapdata = bos.toByteArray();
+
+
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream(file);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        try {
+            fos.write(bitmapdata);
+            fos.flush();
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return file;
     }
 
 }

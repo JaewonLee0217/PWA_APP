@@ -23,25 +23,24 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
     public SurfaceHolder holder;
     public Camera camera=null;
     public Bitmap nowBitmap=null;
-
+    public Context context;
 
 
     public CameraSurfaceView(Context context) {
         super(context);
         init(context);
-
     }
 
     public CameraSurfaceView(Context context, AttributeSet attrs) {
         super(context, attrs);
         init(context);
-
     }
 
 
     private void init(Context context) {
         holder=getHolder();
         holder.addCallback(this);
+        this.context=context;
     }
 
 
@@ -50,9 +49,7 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
     public void surfaceCreated(SurfaceHolder holder) {
 
 
-        Log.d("camera", "created");
         camera = Camera.open(0);
-
 
         if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) {
             camera.setDisplayOrientation(90);
@@ -79,6 +76,7 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 
 
             parameters.setPictureSize(mSize.width, mSize.height);
+            parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
 
             camera.setParameters(parameters);
             camera.setPreviewDisplay(holder);
@@ -86,14 +84,11 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
 
 
 
+
         }catch(IOException e){
             e.printStackTrace();
         }
     }
-
-
-
-
 
 
 
@@ -112,6 +107,13 @@ public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Call
         } catch (Exception e){
             // ignore: tried to stop a non-existent preview
             //Log.d(TAG, "Error stopping camera preview: " + e.getMessage());
+        }
+
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT) {
+            camera.setDisplayOrientation(90);
+            Camera.Parameters parameters = camera.getParameters();
+            parameters.setRotation(90);
+            camera.setParameters(parameters);
         }
 
         try {
